@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <termios.h>
 #include <time.h>
-#include <unistd.h>
 
 #define COLUMNS 15
 #define ROWS 15
@@ -11,16 +10,6 @@
 #define EMPTY_CELL ' '
 #define MINE_CELL '@'
 #define HIDDEN_CELL '.'
-#define CLEAR "\x1B[2J"
-#define CLEARLINE "\x1B[2K"
-#define CURSOR "\x1B[%d;%dH"
-#define UP "\x1B[%dA"
-#define DOWN "\x1B[%dB"
-#define RIGHT "\x1B[%dC"
-#define LEFT "\x1B[%dD"
-#define RESET "\x1B[0m"
-#define HIDE_CURSOR "\x1B[?25l"
-#define SHOW_CURSOR "\x1B[?25h"
 #define CELL_TYPE 0
 #define MINE_TYPE 1
 
@@ -49,29 +38,35 @@ int getch(void) {
   int ch;
   struct termios oldt;
   struct termios newt;
-  tcgetattr(STDIN_FILENO, &oldt);
+  tcgetattr(0, &oldt); // STDIN_FILENO
   newt = oldt;
   newt.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+  tcsetattr(0, TCSANOW, &newt); // STDIN_FILENO
   ch = getchar();
-  tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+  tcsetattr(0, TCSANOW, &oldt); // STDIN_FILENO
   return ch;
 }
 
-// Initialize the terminal with the necessary settings
-void initialize_term() {
-  srand(time(NULL));
-  printf(CLEAR);
-  printf(HIDE_CURSOR);
-  printf(CURSOR, 1, 1);
+// Move the cursor to the given position
+void cursor_at(int x, int y) { printf("\x1B[%d;%dH", y, x); }
+
+void clear_entire_screen() {
+  printf("\x1B[2J");
+  for (int i = 1; i < ROWS + 1; i++) {
+    cursor_at(1, i);
+    printf("\x1B[2K");
+  }
+  cursor_at(1, 1);
 }
 
-// Reset the terminal to its original state
-void finalize_term() {
-  printf(SHOW_CURSOR);
-  printf(RESET);
-  printf(CLEAR);
-  printf(CURSOR, 1, 1);
+void init_term() {
+  clear_entire_screen();
+  printf("\x1B[?25l");
+}
+
+void reset_term() {
+  clear_entire_screen();
+  printf("\x1B[?25h");
 }
 
 // Initialize the field with the given dimensions and coverage
@@ -183,7 +178,7 @@ void reveal_all_cells(struct Field *f) {
   }
 }
 
-// Check if all the cells have been revealed
+// Check if all the cells that are not bombs have been revealed
 int has_won(struct Field *f) {
   for (int i = 0; i < f->rows; i++) {
     for (int j = 0; j < f->columns; j++) {
@@ -194,51 +189,41 @@ int has_won(struct Field *f) {
   return 1;
 }
 
-// Print the message for the player losing the game
-void player_lost(struct Field *f) {
-  reveal_all_cells(f);
-  printf(UP, f->rows);
-  print_field(f);
-  printf("You Lost!\n");
-  printf("Press any key to exit\n");
-  getch();
+// Check if user stepped on a mine
+int has_lost(struct Field *f) {
+  return f->cells[f->cursor.y][f->cursor.x].type == MINE_TYPE;
 }
 
-// Print the message for the player winning the game
-void player_won(struct Field *f) {
+// What to do when the match ends wether the player won or lost
+void match_end(struct Field *f, char *message) {
   reveal_all_cells(f);
-  printf(UP, f->rows);
+  clear_entire_screen();
   print_field(f);
-  printf("You Won!\n");
+  printf("%s\n", message);
   printf("Press any key to exit\n");
   getch();
 }
 
 // Ask the player if they want to quit the game
 int should_quit() {
-  printf("Are you sure you want to quit? (y/n)\n");
+  printf("Are you sure you want to quit? (y/N)\n");
   int c = getch();
-  if (c == 'y') {
-    return 0;
-  } else {
-    printf(CLEARLINE);
-    printf(UP, 1);
-    printf(CLEARLINE);
-    return 1;
-  }
+  return c != 'y';
 }
 
-// Handle the SIGINT signal (Ctrl+C) to reset the terminal before exiting
+// Reset the terminal when Ctrl+C is pressed
 void sigint_handler() {
-  finalize_term();
+  reset_term();
   exit(0);
 }
 
 // TODO: Area discover when cell is empty
 // TODO: Flagging
 int main() {
+  srand(time(NULL));
   signal(SIGINT, sigint_handler);
-  initialize_term();
+  init_term();
+  printf("\x1B[?25l");
   int running = 1, first_move = 1;
   Field field = Field_Default;
   initialize_field(&field, COLUMNS, ROWS, COVERAGE);
@@ -267,20 +252,23 @@ int main() {
         generate_mines(&field);
         first_move = 0;
       }
+      if (has_lost(&field)) {
+        match_end(&field, "You lost!");
+        running = 0;
+        break;
+      }
+      if (has_won(&field)) {
+        match_end(&field, "You won!");
+        running = 0;
+        break;
+      }
       set_neighbours_bombs(&field);
       reveal_cell(&field);
-      if (field.cells[field.cursor.y][field.cursor.x].type == MINE_TYPE) {
-        player_lost(&field);
-        running = 0;
-      } else if (has_won(&field)) {
-        player_won(&field);
-        running = 0;
-      }
       break;
     }
-    printf(UP, field.rows);
+    clear_entire_screen();
     print_field(&field);
   }
-  finalize_term();
+  reset_term();
   return 0;
 };
