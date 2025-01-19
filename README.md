@@ -19,4 +19,4 @@ $ ./mine
 ## Todo
 
 - [ ] Add flagging
-- [ ] Area discover when cell is empty 
+- [X] Area discover when cell is empty 

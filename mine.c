@@ -7,6 +7,7 @@
 #define COLUMNS 15
 #define ROWS 15
 #define COVERAGE 20
+#define AREA 2
 #define EMPTY_CELL ' '
 #define MINE_CELL '@'
 #define HIDDEN_CELL '.'
@@ -149,10 +150,10 @@ void generate_mines(struct Field *f) {
 }
 
 // Set the value of the cell to the number of neighbouring bombs
-void set_neighbours_bombs(struct Field *f) {
-  if (f->cells[f->cursor.y][f->cursor.x].type == MINE_TYPE)
-    return;
+int set_neighbours_bombs(struct Field *f) {
   int x = f->cursor.x, y = f->cursor.y;
+  if (f->cells[y][x].type == MINE_TYPE)
+    return 1;
   int count = 0;
   for (int i = y - 1; i <= y + 1; i++) {
     for (int j = x - 1; j <= x + 1; j++) {
@@ -163,6 +164,23 @@ void set_neighbours_bombs(struct Field *f) {
     }
   }
   f->cells[y][x].value = count + '0';
+  return count;
+}
+
+void reveal_area(struct Field *f) {
+  int x = f->cursor.x, y = f->cursor.y;
+  for (int i = y - AREA; i <= y + AREA; i++) {
+    for (int j = x - AREA; j <= x + AREA; j++) {
+      if (i >= 0 && i < f->rows && j >= 0 && j < f->columns) {
+        if (f->cells[i][j].type == CELL_TYPE) {
+          f->cursor.y = i;
+          f->cursor.x = j;
+          reveal_cell(f);
+          set_neighbours_bombs(f);
+        }
+      }
+    }
+  }
 }
 
 // Reveal all cells in the field
@@ -217,7 +235,6 @@ void sigint_handler() {
   exit(0);
 }
 
-// TODO: Area discover when cell is empty
 // TODO: Flagging
 int main() {
   srand(time(NULL));
@@ -262,8 +279,10 @@ int main() {
         running = 0;
         break;
       }
-      set_neighbours_bombs(&field);
-      reveal_cell(&field);
+      if (!set_neighbours_bombs(&field))
+        reveal_area(&field);
+      else
+        reveal_cell(&field);
       break;
     }
     clear_entire_screen();
