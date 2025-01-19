@@ -21,7 +21,6 @@
 #define RESET "\x1B[0m"
 #define HIDE_CURSOR "\x1B[?25l"
 #define SHOW_CURSOR "\x1B[?25h"
-#define INVERT_TEXT "\x1B[7m"
 #define CELL_TYPE 0
 #define MINE_TYPE 1
 
