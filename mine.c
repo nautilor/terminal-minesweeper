@@ -289,9 +289,11 @@ int main() {
         running = 0;
         break;
       }
-      if (!set_neighbours_bombs(&field))
+      if (!set_neighbours_bombs(&field)) {
+        struct Cursor cursor = field.cursor;
         reveal_area(&field);
-      else
+        field.cursor = cursor;
+      } else
         reveal_cell(&field);
       break;
     }
