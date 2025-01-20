@@ -10,14 +10,16 @@
 #define AREA 2
 #define EMPTY_CELL ' '
 #define MINE_CELL '@'
+#define FLAG_CELL '?'
 #define HIDDEN_CELL '.'
 #define CELL_TYPE 0
 #define MINE_TYPE 1
+#define FLAG_TYPE 2
 
 struct Cell {
   int type;
   char value;
-  int revealed;
+  int revealed, flagged;
   int col, row;
 };
 
@@ -79,6 +81,7 @@ void initialize_field(struct Field *f, int cols, int rows, int cov) {
       f->cells[i][j].type = CELL_TYPE;
       f->cells[i][j].value = HIDDEN_CELL;
       f->cells[i][j].revealed = 0;
+      f->cells[i][j].flagged = 0;
       f->cells[i][j].col = j;
       f->cells[i][j].row = i;
     }
@@ -89,9 +92,6 @@ void initialize_field(struct Field *f, int cols, int rows, int cov) {
 void print_field(struct Field *f) {
   for (int i = 0; i < f->rows; i++) {
     for (int j = 0; j < f->columns; j++) {
-      if (f->cells[i][j].value == '0') {
-        f->cells[i][j].value = EMPTY_CELL;
-      }
       if (f->cursor.x == j && f->cursor.y == i) {
         printf("[%c]", f->cells[i][j].value);
       } else {
@@ -149,6 +149,14 @@ void generate_mines(struct Field *f) {
   }
 }
 
+void flag_cell(struct Field *f) {
+  int x = f->cursor.x, y = f->cursor.y;
+  if (f->cells[y][x].revealed)
+    return;
+  f->cells[y][x].flagged = !f->cells[y][x].flagged;
+  f->cells[y][x].value = f->cells[y][x].flagged ? FLAG_CELL : HIDDEN_CELL;
+}
+
 // Set the value of the cell to the number of neighbouring bombs
 int set_neighbours_bombs(struct Field *f) {
   int x = f->cursor.x, y = f->cursor.y;
@@ -163,7 +171,7 @@ int set_neighbours_bombs(struct Field *f) {
       }
     }
   }
-  f->cells[y][x].value = count + '0';
+  f->cells[y][x].value = count ? count + '0' : EMPTY_CELL;
   return count;
 }
 
@@ -235,7 +243,6 @@ void sigint_handler() {
   exit(0);
 }
 
-// TODO: Flagging
 int main() {
   srand(time(NULL));
   signal(SIGINT, sigint_handler);
@@ -260,6 +267,9 @@ int main() {
       break;
     case 'a':
       move_cursor(&field, 3);
+      break;
+    case 'f':
+      flag_cell(&field);
       break;
     case 'q':
       running = should_quit();
