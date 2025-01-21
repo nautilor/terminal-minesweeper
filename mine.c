@@ -21,11 +21,15 @@ struct Cell {
   char value;
   int revealed, flagged;
   int col, row;
-};
+} Cell_Default = {CELL_TYPE, HIDDEN_CELL, 0, 0, 0, 0};
+
+typedef struct Cell Cell;
 
 struct Cursor {
   int x, y;
 };
+
+typedef struct Cursor Cursor;
 
 struct Field {
   int columns, rows;
@@ -73,15 +77,12 @@ void reset_term() {
 }
 
 // Initialize the field with the given dimensions and coverage
-void initialize_field(struct Field *f, int cols, int rows, int cov) {
+void initialize_field(Field *f, int cols, int rows, int cov) {
   f->cells = (struct Cell **)malloc(sizeof(struct Cell *) * rows);
   for (int i = 0; i < rows; i++) {
     f->cells[i] = (struct Cell *)malloc(sizeof(struct Cell) * cols);
     for (int j = 0; j < cols; j++) {
-      f->cells[i][j].type = CELL_TYPE;
-      f->cells[i][j].value = HIDDEN_CELL;
-      f->cells[i][j].revealed = 0;
-      f->cells[i][j].flagged = 0;
+      f->cells[i][j] = Cell_Default;
       f->cells[i][j].col = j;
       f->cells[i][j].row = i;
     }
@@ -89,7 +90,7 @@ void initialize_field(struct Field *f, int cols, int rows, int cov) {
 }
 
 // Print the field to the terminal
-void print_field(struct Field *f) {
+void print_field(Field *f) {
   for (int i = 0; i < f->rows; i++) {
     for (int j = 0; j < f->columns; j++) {
       if (f->cursor.x == j && f->cursor.y == i) {
@@ -103,7 +104,7 @@ void print_field(struct Field *f) {
 }
 
 // Move the cursor in the given direction
-void move_cursor(struct Field *f, int direction) {
+void move_cursor(Field *f, int direction) {
   switch (direction) {
   case 0:
     if (f->cursor.y > 0)
@@ -125,7 +126,7 @@ void move_cursor(struct Field *f, int direction) {
 }
 
 // Change the state of the cell at the cursor position
-void reveal_cell(struct Field *f) {
+void reveal_cell(Field *f) {
   int x = f->cursor.x, y = f->cursor.y;
   if (f->cells[y][x].revealed)
     return;
@@ -136,7 +137,7 @@ void reveal_cell(struct Field *f) {
 }
 
 // Generate mines in the field based on the coverage percentage
-void generate_mines(struct Field *f) {
+void generate_mines(Field *f) {
   int mines = (f->columns * f->rows) * f->coverage / 100;
   while (mines) {
     int x = rand() % f->columns;
@@ -149,7 +150,7 @@ void generate_mines(struct Field *f) {
   }
 }
 
-void flag_cell(struct Field *f) {
+void flag_cell(Field *f) {
   int x = f->cursor.x, y = f->cursor.y;
   if (f->cells[y][x].revealed)
     return;
@@ -158,7 +159,7 @@ void flag_cell(struct Field *f) {
 }
 
 // Set the value of the cell to the number of neighbouring bombs
-int set_neighbours_bombs(struct Field *f) {
+int set_neighbours_bombs(Field *f) {
   int x = f->cursor.x, y = f->cursor.y;
   if (f->cells[y][x].type == MINE_TYPE)
     return 1;
@@ -175,7 +176,7 @@ int set_neighbours_bombs(struct Field *f) {
   return count;
 }
 
-void reveal_area(struct Field *f) {
+void reveal_area(Field *f) {
   int x = f->cursor.x, y = f->cursor.y;
   for (int i = y - AREA; i <= y + AREA; i++) {
     for (int j = x - AREA; j <= x + AREA; j++) {
@@ -192,7 +193,7 @@ void reveal_area(struct Field *f) {
 }
 
 // Reveal all cells in the field
-void reveal_all_cells(struct Field *f) {
+void reveal_all_cells(Field *f) {
   for (int i = 0; i < f->rows; i++) {
     for (int j = 0; j < f->columns; j++) {
       f->cursor.x = j;
@@ -205,7 +206,7 @@ void reveal_all_cells(struct Field *f) {
 }
 
 // Check if all the cells that are not bombs have been revealed
-int has_won(struct Field *f) {
+int has_won(Field *f) {
   for (int i = 0; i < f->rows; i++) {
     for (int j = 0; j < f->columns; j++) {
       if (f->cells[i][j].type == CELL_TYPE && !f->cells[i][j].revealed)
@@ -216,7 +217,7 @@ int has_won(struct Field *f) {
 }
 
 // Check if user stepped on a mine
-int has_lost(struct Field *f) {
+int has_lost(Field *f) {
   return f->cells[f->cursor.y][f->cursor.x].type == MINE_TYPE;
 }
 
@@ -290,7 +291,7 @@ int main() {
         break;
       }
       if (!set_neighbours_bombs(&field)) {
-        struct Cursor cursor = field.cursor;
+        Cursor cursor = field.cursor;
         reveal_area(&field);
         field.cursor = cursor;
       } else
